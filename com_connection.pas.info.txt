@@ -1,0 +1,122 @@
+unit Unit1;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, registry, Vcl.StdCtrls, Vcl.ExtCtrls;
+
+type
+  TForm1 = class(TForm)
+    ComboBox1: TComboBox;
+    Button1: TButton;
+    Button2: TButton;
+    Timer1: TTimer;
+    Memo1: TMemo;
+    procedure FormCreate(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+     comHandle: THandle;
+       acceptValue: byte;
+        comConecting: boolean;
+  ct: TCommTimeouts;
+  dcb: TDCB;
+        Status: DWord;
+
+implementation
+
+{$R *.dfm}
+
+
+
+function list_ComPort():TStringList;
+var
+  registry: TRegistry;
+  tempList: TStringList;
+  listCom:  TStringList;
+  forCycle: Byte;
+begin
+  list_ComPort:= TStringList.Create;
+  tempList:= TStringList.Create;
+  listCom:= TStringList.Create;
+    registry:=Tregistry.Create;
+    registry.RootKey:=HKEY_LOCAL_MACHINE;
+    registry.OpenKey('HARDWARE\DEVICEMAP\SERIALCOMM',false);
+    registry.GetValueNames(tempList);
+    registry.CloseKey;
+    for forCycle:=0 to tempList.Count-1 do begin
+      registry:=Tregistry.Create;
+      registry.RootKey:=HKEY_LOCAL_MACHINE;
+      registry.OpenKey('HARDWARE\DEVICEMAP\SERIALCOMM',true);
+      if registry.ReadString(tempList[forCycle])<>'' then
+        listCom.Add(registry.ReadString(tempList[forCycle]));
+      registry.CloseKey;
+      registry.Free;
+    end;
+  list_ComPort.AddStrings(listCom);
+  tempList.Clear;
+  tempList.Free;
+  listCom.Clear;
+  listCom.Free;
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+  comHandle := CreateFile(PChar(combobox1.Text), GENERIC_READ or
+                              GENERIC_WRITE,
+                              FILE_SHARE_READ or FILE_SHARE_WRITE,
+                              nil, OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL, 0);
+
+  if (comHandle < 0) or not SetupComm(comHandle, 2048, 2048)or not
+    GetCommState(comHandle, dcb) then exit; //init error
+
+  dcb.BaudRate:= 9600;
+  dcb.ByteSize:= 8;
+  if not SetCommState(comHandle, dcb)or not GetCommTimeouts(comHandle, ct)
+    then exit; //error
+  ct.ReadTotalTimeoutConstant:= 50;
+  ct.ReadIntervalTimeout:= 50;
+  ct.ReadTotalTimeoutMultiplier:= 1;
+  ct.WriteTotalTimeoutMultiplier:= 0;
+  ct.WriteTotalTimeoutConstant:= 10;
+  if not SetCommTimeouts(comHandle, ct)
+    or not SetCommMask(comHandle, EV_RING + EV_RXCHAR + EV_RXFLAG + EV_TXEMPTY)
+    then  exit;  //error
+end;
+
+procedure TForm1.Button2Click(Sender: TObject);
+begin
+ CloseHandle(comHandle);
+end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+combobox1.Items.Clear;
+combobox1.Text:='';
+combobox1.Items.AddStrings(list_comport);
+end;
+
+procedure TForm1.Timer1Timer(Sender: TObject);
+begin
+{if SetCommTimeouts(comHandle, ct)
+    or  SetCommMask(comHandle, EV_RING + EV_RXCHAR + EV_RXFLAG + EV_TXEMPTY)
+ then form1.Caption:= 'con'
+else form1.Caption:='dis';     }
+
+ if  GetCommModemStatus(comHandle, Status)then
+  form1.Caption:= 'con'
+else form1.Caption:='dis';
+
+end;
+
+end.

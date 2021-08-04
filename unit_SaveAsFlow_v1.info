@@ -1,0 +1,169 @@
+unit unit_SaveAsFlow;
+
+interface
+
+uses
+    Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.SvcMgr, Vcl.Dialogs, IdBaseComponent,
+  IdComponent, IdCustomTCPServer, IdCustomHTTPServer, IdHTTPServer, IdContext,
+  Forms, WinSvc, CommCtrl, ActiveX, PsAPI,shellapi, registry, unit_DataRequest,
+  comobj,ExcelXP;
+
+type
+  SaveAsFlow = class(TThread)
+  private
+    { Private declarations }
+  protected
+    procedure Execute; override;
+  end;
+
+  var
+    nameMdb:String;
+
+
+implementation
+uses  service_unit, unit_form_install,unit_WriteDataExchFlow,unit_DataExchFlow;
+
+
+{ SaveAsFlow }
+
+procedure ExtractRes(ResType, ResName, ResNewName : String);
+var
+Res : TResourceStream;
+Begin
+// ResType - тип ресурса в нашем случае это программа с типом EXEFILE
+// ResName - имя ресурса
+// ResNewName - соответственно имя нового файла
+Res:=TResourceStream.Create(Hinstance, Resname, Pchar(ResType));
+Res.SavetoFile(ResNewName);
+Res.Free;
+end;
+
+function nameFileConvect(timeDat:TDateTime):string;
+  var
+    tempString:string;
+    forCycle:integer;
+begin
+  tempString:= DateToStr(timeDat)+'_'+TimeToStr(timeDat);
+  for forCycle:= 1 to length(tempString) do
+    if tempString[forCycle]=':' then  tempString[forCycle]:='-';
+    nameFileConvect:=tempString;
+end;
+
+procedure newFileMdb();
+var   tempTimeData: TDateTime;
+begin
+tempTimeData:=now;
+nameMdb:= nameFileConvect(tempTimeData)+'.mdb';
+          ExtractRes('EXEFILE', 'LIST',
+          form_install.dirFile+   '\'+ nameMdb);
+end;
+
+procedure SaveAsFlow.Execute;
+var
+  indexXlsFile:integer;
+  f:System.Text; //класс текстового файла
+begin
+CoInitialize(nil);
+ newFileMdb;
+  //подключение по пути form_install.dirFile+   '\'+ nameXls
+  mr_service.ADOQuery1.ConnectionString:=
+    'Provider=Microsoft.Jet.OLEDB.4.0;Data Source="'+form_install.dirFile+   '\'+ nameMdb+'";Persist Security Info=False';
+  mr_service.ADOQuery1.Active:=false;
+  indexXlsFile:=1;
+  form_install.startSaveAs:=true;
+   while (form_install.saveAs and form_install.stopFlow) do begin
+     //запись -----------------------------
+    //open table minimal
+    try
+     mr_service.ADOQuery1.Active:=false;
+     mr_service.ADOQuery1.SQL.Clear;
+     mr_service.ADOQuery1.SQL.Add('SELECT * FROM min_');
+     mr_service.ADOQuery1.Active:=true;
+   mr_service.ADOQuery1.Last;
+   mr_service.ADOQuery1.Insert;
+   mr_service.ADOQuery1.Edit;
+   mr_service.ADOQuery1.FieldByName('Data').AsDateTime:= Date;    ///?
+   mr_service.ADOQuery1.FieldByName('Time').AsDateTime:= Time;
+   mr_service.ADOQuery1.FieldByName('Uab').AsFloat:=  StatisticOnXls.minLineVoltege[0];
+   mr_service.ADOQuery1.FieldByName('Ubc').AsFloat:=  StatisticOnXls.minLineVoltege[1];
+   mr_service.ADOQuery1.FieldByName('Uca').AsFloat:=  StatisticOnXls.minLineVoltege[2];
+   mr_service.ADOQuery1.FieldByName('Ua').AsFloat:=  StatisticOnXls.minPhaseVoltege[0];
+   mr_service.ADOQuery1.FieldByName('Ub').AsFloat:=  StatisticOnXls.minPhaseVoltege[1];
+   mr_service.ADOQuery1.FieldByName('Uc').AsFloat:=  StatisticOnXls.minPhaseVoltege[2];
+   mr_service.ADOQuery1.FieldByName('Ia').AsFloat:=  StatisticOnXls.minCurrent[0];
+   mr_service.ADOQuery1.FieldByName('Ib').AsFloat:=  StatisticOnXls.minCurrent[1];
+   mr_service.ADOQuery1.FieldByName('Ic').AsFloat:=  StatisticOnXls.minCurrent[2];
+   mr_service.ADOQuery1.FieldByName('f').AsFloat:=   StatisticOnXls.frequency[0];
+     mr_service.ADOQuery1.Post;
+     mr_service.ADOQuery1.Active:=false;
+
+    //open table average
+     mr_service.ADOQuery1.Active:=false;
+     mr_service.ADOQuery1.SQL.Clear;
+     mr_service.ADOQuery1.SQL.Add('SELECT * FROM ave');
+     mr_service.ADOQuery1.Active:=true;
+   mr_service.ADOQuery1.Last;
+   mr_service.ADOQuery1.Insert;
+   mr_service.ADOQuery1.Edit;
+   mr_service.ADOQuery1.FieldByName('Uab').AsFloat:=  StatisticOnXls.aveLineVoltege[0];
+   mr_service.ADOQuery1.FieldByName('Ubc').AsFloat:=  StatisticOnXls.aveLineVoltege[1];
+   mr_service.ADOQuery1.FieldByName('Uca').AsFloat:=  StatisticOnXls.aveLineVoltege[2];
+   mr_service.ADOQuery1.FieldByName('Ua').AsFloat:=  StatisticOnXls.avePhaseVoltege[0];
+   mr_service.ADOQuery1.FieldByName('Ub').AsFloat:=  StatisticOnXls.avePhaseVoltege[1];
+   mr_service.ADOQuery1.FieldByName('Uc').AsFloat:=  StatisticOnXls.avePhaseVoltege[2];
+   mr_service.ADOQuery1.FieldByName('Ia').AsFloat:=  StatisticOnXls.aveCurrent[0];
+   mr_service.ADOQuery1.FieldByName('Ib').AsFloat:=  StatisticOnXls.aveCurrent[1];
+   mr_service.ADOQuery1.FieldByName('Ic').AsFloat:=  StatisticOnXls.aveCurrent[2];
+   mr_service.ADOQuery1.FieldByName('f').AsFloat:=   StatisticOnXls.frequency[1];
+     mr_service.ADOQuery1.Post;
+     mr_service.ADOQuery1.Active:=false;
+    //---------------------------------------
+    //open table maximum
+     mr_service.ADOQuery1.Active:=false;
+     mr_service.ADOQuery1.SQL.Clear;
+     mr_service.ADOQuery1.SQL.Add('SELECT * FROM max_');
+     mr_service.ADOQuery1.Active:=true;
+   mr_service.ADOQuery1.Last;
+   mr_service.ADOQuery1.Insert;
+   mr_service.ADOQuery1.Edit;
+   mr_service.ADOQuery1.FieldByName('Uab').AsFloat:=  StatisticOnXls.maxLineVoltege[0];
+   mr_service.ADOQuery1.FieldByName('Ubc').AsFloat:=  StatisticOnXls.maxLineVoltege[1];
+   mr_service.ADOQuery1.FieldByName('Uca').AsFloat:=  StatisticOnXls.maxLineVoltege[2];
+   mr_service.ADOQuery1.FieldByName('Ua').AsFloat:=  StatisticOnXls.maxPhaseVoltege[0];
+   mr_service.ADOQuery1.FieldByName('Ub').AsFloat:=  StatisticOnXls.maxPhaseVoltege[1];
+   mr_service.ADOQuery1.FieldByName('Uc').AsFloat:=  StatisticOnXls.maxPhaseVoltege[2];
+   mr_service.ADOQuery1.FieldByName('Ia').AsFloat:=  StatisticOnXls.maxCurrent[0];
+   mr_service.ADOQuery1.FieldByName('Ib').AsFloat:=  StatisticOnXls.maxCurrent[1];
+   mr_service.ADOQuery1.FieldByName('Ic').AsFloat:=  StatisticOnXls.maxCurrent[2];
+   mr_service.ADOQuery1.FieldByName('f').AsFloat:=   StatisticOnXls.frequency[2];
+     mr_service.ADOQuery1.Post;
+     mr_service.ADOQuery1.Active:=false;
+     except on E:exception do begin
+      form_install.errorStream.Add(E.Message+'___'+E.StackTrace);
+      form_install.errorStream.SaveToFile(form_install.dirFile+'\e.txt');
+    end;
+
+    end;
+    //---------------------------------------
+    indexXlsFile:=indexXlsFile+1;
+    sleep(30000);
+    if indexXlsFile >=10 then begin
+      //new file
+     //  закрыть старй файл
+      indexXlsFile:=1;
+      newFileMdb;
+      //подключаемя к новый
+  mr_service.ADOQuery1.ConnectionString:=
+    'Provider=Microsoft.Jet.OLEDB.4.0;Data Source="'+form_install.dirFile+   '\'+ nameMdb+'";Persist Security Info=False';
+
+
+    end;
+
+  end; //Save Cycle
+  // закрытие таблицы
+  form_install.startSaveAs:=false;
+  { Place thread code here }
+end;
+
+end.
